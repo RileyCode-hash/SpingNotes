@@ -1929,3 +1929,8 @@ cond(no)->para
 para(path1, bottom)->sub1(right)->op1
 para(path2, top)->op1
 ```
+git init
+ git add *
+  git commit -m "init SPRING"  
+   git remote add origin git@github.com:RileyCode-hash/SpringNotes.git
+    git push origin master
