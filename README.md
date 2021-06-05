@@ -1,11 +1,93 @@
-<script src="raphael-min.js"><
-<script src="flowchart-latest.js"></script>
+# Spring Code Learning Notes with Code Examples
+> This is my learning note about how Spring core features like IoC, AOP works, with Code Examples .
 
----
- # Spring V1.0主要功能" 
 
----
+## Table of Contents
+* [Spring V1.0 DispatcherServlet](#Spring_V1.0_DispatcherServlet)
+* [from Servlet to ApplicatoinContext](#from-servlet-to-applicatoinContext)
+* [Features](#features)
+* [Screenshots](#screenshots)
+* [Setup](#setup)
+* [Usage](#usage)
+* [Project Status](#project-status)
+* [Room for Improvement](#room-for-improvement)
+* [Acknowledgements](#acknowledgements)
+* [Contact](#contact)
+<!-- * [License](#license) -->
 
+
+## General Information
+- Provide general information about your project here.
+- What problem does it (intend to) solve?
+- What is the purpose of your project?
+- Why did you undertake it?
+<!-- You don't have to answer all the questions - just the ones relevant to your project. -->
+
+
+## Technologies Used
+- Tech 1 - version 1.0
+- Tech 2 - version 2.0
+- Tech 3 - version 3.0
+
+
+## Features
+List the ready features here:
+- Awesome feature 1
+- Awesome feature 2
+- Awesome feature 3
+
+
+## Screenshots
+![Example screenshot](./img/screenshot.png)
+<!-- If you have screenshots you'd like to share, include them here. -->
+
+
+## Setup
+What are the project requirements/dependencies? Where are they listed? A requirements.txt or a Pipfile.lock file perhaps? Where is it located?
+
+Proceed to describe how to install / setup one's local environment / get started with the project.
+
+
+## Usage
+How does one go about using it?
+Provide various use cases and code examples here.
+
+`write-your-code-here`
+
+
+## Project Status
+Project is: _in progress_ / _complete_ / _no longer being worked on_. If you are no longer working on it, provide reasons why.
+
+
+## Room for Improvement
+Include areas you believe need improvement / could be improved. Also add TODOs for future development.
+
+Room for improvement:
+- Improvement to be done 1
+- Improvement to be done 2
+
+To do:
+- Feature to be added 1
+- Feature to be added 2
+
+
+## Acknowledgements
+Give credit here.
+- This project was inspired by...
+- This project was based on [this tutorial](https://www.example.com).
+- Many thanks to...
+
+
+## Contact
+Created by [@flynerdpl](https://www.flynerd.pl/) - feel free to contact me!
+
+
+<!-- Optional -->
+<!-- ## License -->
+<!-- This project is open source and available under the [... License](). -->
+
+<!-- You don't have to include all sections - just the one's relevant to your project -->
+## Spring V1.0 DispatcherServlet
 ## Spring IoC， DI, MVC的工作原理
 
 ### 遵循单一职责原则
@@ -97,7 +179,560 @@
 ##  Spring IoC
 
 **工厂模式，原型，单例（工厂怎么把对象创建出来，交给用户）**
-## 从Servlet到ApplicatoinContext
+## from Servlet to ApplicatoinContext
+
+![](https://cdn.jsdelivr.net/gh/gyl-coder/blogImgs/images/spring/ioc-aop/image-20200411114146872.png)
+
+### 1. Spring IOC
+
+**without IOC**
+
+![](https://cdn.jsdelivr.net/gh/gyl-coder/blogImgs/images/spring/ioc-aop/image-20200411115607696.png)
+
+**when we need a new Impl, problem occurs**
+![](https://cdn.jsdelivr.net/gh/gyl-coder/blogImgs/images/spring/ioc-aop/image-20200411120144353.png)
+
+**use IOC, we save lots of time for adjusting code**
+![](https://cdn.jsdelivr.net/gh/gyl-coder/blogImgs/images/spring/ioc-aop/image-20200411120751016.png)
+
+## here is a case:
+
+Transfer Funds to Other Bank's Account:  A sent money to B account
+
+
+**without IOC**
+
+**table**
+````base
+name    varcher     255 username
+money   int         255 balance
+cardNo  varcher     255 bank account
+````
+
+**call flow**
+
+ `Transfer page`     *// page `transfer` botton, send ajax requirement to TransferServlet*
+
+&vArr;  &vArr; 
+
+ `TransferServlet`    //  servlet instance is initialized, invokes its Service layer method： TransferService transferService = newTransferServiceImpl();
+
+
+&vArr;  &vArr;
+`TransferService` // service class create Dao instance as singleton, invokes its Dao layer method： AccountDao accountDao = new JdbcAccountDaoImpl();
+
+&vArr;  &vArr; 
+`AccountDao`  // Dao provides multiple Impl
+  
+&darr;.......................................  &darr; 
+`JdbcAccountDaoImpl`   `MybatisAccountDaoImpl`
+
+**core code**
+````java
+@WebServlet(name = "transerServlet", urlPatterns = "/transferServlet")
+public class TransferServlet extends HttpServlet {
+    // create service instance
+    private TransferService transferService = new TransferServiceImpl();
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOE {
+        doPost(req, resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOE {
+
+        req.setCharacterEncoding("UTF-8");
+
+        String fromCardNo = req.getParameter("fromCardNo");
+        String toCardNo = req.getParameter("toCardNo");
+        String moneyStr = req.getParameter("money");
+        int money = Integer.parseInt(moneyStr);
+
+        Result result = new Result();
+
+        try {
+            // invoke service method
+            transferService.transfer(fromCardNo,toCardNo,money);
+            result.setStatus("200");
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.setStatus("201");
+            result.setMessage(e.toString());
+        }
+
+        // response
+        resp.setContentType("application/json;charset=utf-8");
+        resp.getWriter().print(JsonUtils.object2Json(result));
+        }
+    }
+}
+````
+````java
+public interface TransferService {
+    void transfer(String fromCardNo, String toCardNo, int money) throws Exception;
+}
+````
+
+````java
+public class TransferServiceImpl implements TransferService {
+
+    private AccountDao accountDao = new JdbcAccountDaoImpl();
+
+    @Override
+    public void transfer(String fromCardNo, String toCardNo, int money) throws Exception {
+            Account from = accountDao.queryAccountByCardNo(fromCardNo);
+            Account to = accountDao.queryAccountByCardNo(toCardNo);
+
+            from.setMoney(from.getMoney()-money);
+            to.setMoney(to.getMoney()+money);
+
+            accountDao.updateAccountByCardNo(to);
+            accountDao.updateAccountByCardNo(from);
+    }
+}
+
+````
+
+````java
+public interface AccountDao {
+
+    /**
+     * get account by query accountNo
+     * @param cardNo
+     * @return
+     * @throws Exception
+     */
+    Account queryAccountByCardNo(String cardNo) throws Exception;
+
+    /**
+     * up aacount information
+     * @param account
+     * @return
+     * @throws Exception
+     */
+    int updateAccountByCardNo(Account account) throws Exception;
+}
+````
+````java
+public class JdbcAccountDaoImpl implements AccountDao {
+
+    @Override
+    public Account queryAccountByCardNo(String cardNo) throws Exception {
+        
+        Connection con = DruidUtils.getInstance().getConnection();
+        String sql = "select * from account where cardNo=?";
+        PreparedStatement preparedStatement = con.prepareStatement(sql);
+        preparedStatement.setString(1,cardNo);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        Account account = new Account();
+        while(resultSet.next()) {
+            account.setCardNo(resultSet.getString("cardNo"));
+            account.setName(resultSet.getString("name"));
+            account.setMoney(resultSet.getInt("money"));
+        }
+
+        resultSet.close();
+        preparedStatement.close();
+        con.close();
+
+        return account;
+    }
+
+    @Override
+    public int updateAccountByCardNo(Account account) throws Exception {
+        
+        Connection con = DruidUtils.getInstance().getConnection();
+        String sql = "update account set money=? where cardNo=?";
+        PreparedStatement preparedStatement = con.prepareStatement(sql);
+        preparedStatement.setInt(1,account.getMoney());
+        preparedStatement.setString(2,account.getCardNo());
+        int i = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+        con.close();
+        return i;
+    }
+}
+````
+**analysis:**
+
+
+ `Transfer page`     
+
+&vArr;  &vArr; 
+
+ `TransferServlet`    //  public class TransferServlet extends HttpServlet { TransferService transferService = newTransferServiceImpl(); }
+
+
+&vArr;  &vArr;
+interface: `TransferService` // public class TransferServiceImpl implements TransferService {
+impl: `TransferServiceImpl`   // private AccountDao accountDao = new JdbcAccountDaoImpl();
+
+&vArr;  &vArr; 
+interface:`AccountDao`  
+impl: `JdbcAccountDaoImpl`
+
+
+**P1:in service level New define the references to DAO to the concrete implementations as that will make it tightly coupled, not easy in different implementation scenarios, which will lead to modify service code.** 
+
+**P2:serivice layer miss TransactionStatus. And data error may occur in transferring process, cause serious damage.** 
+
+---
+
+**solution**
+
+***P1: new tight coupled problem***
+***solution --Using Reflection to instantiate the object in factory pattern***
+
+````java
+public class TransferServiceImpl implements TransferService {
+
+    // private AccountDao accountDao = new JdbcAccountDaoImpl();
+    private AccountDao accountDao；
+
+    // @Override
+    // public void transfer(String fromCardNo, String toCardNo, int money) throws Exception {
+    //         Account from = accountDao.queryAccountByCardNo(fromCardNo);
+    //         Account to = accountDao.queryAccountByCardNo(toCardNo);
+
+    //         from.setMoney(from.getMoney()-money);
+    //         to.setMoney(to.getMoney()+money);
+
+    //         accountDao.updateAccountByCardNo(to);
+    //         accountDao.updateAccountByCardNo(from);
+    // }
+    public void setAccountDao(AccountDao accountDao) {
+        this.accountDao = accountDao;
+    }
+}
+
+````
+
+Method injection, allows to inject a dependency right at the point of use
+when you have mutiple implementation, Method injection is a good choice
+
+***before:***
+`TransferServiceImpl`
+&darr;
+new
+&darr;
+`JdbcAccountDaoImpl`
+
+***now:***
+`TransferServiceImpl`
+&darr;
+```
+factory read xml file, 
+use reflection to instantiate the object,
+defines an interface for creating objects
+```
+&uarr;
+```
+xml:
+com.test.dao.JdbcAccountDaoImpl
+com.test.service.TransferServiceImpl
+```
+
+***code***
+
+***define bean.xml file***
+````java
+
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--each bean represent a class-->
+<beans>
+    
+    <bean id="accountDao" class="com.test.dao.impl.JdbcAccountDaoImpl">
+        <property name="ConnectionUtils" ref="connectionUtils"/>
+    </bean>
+
+    <bean id="transferService" class="com.test.service.impl.TransferServiceImpl">
+        <!--set+ name, Method injectione -->
+        <property name="AccountDao" ref="accountDao"></property>
+    </bean>
+</beans>
+````
+
+***define BeanFactory***
+````java
+/* 
+* factory class
+* task1: read xml, use reflection to instantiate the object, store in the map
+* task2: provide interfaces for creating objects (id)
+*/
+public class BeanFactory {
+
+    private static Map<String, Object> map = new HashMap<>(); // store object
+
+
+    /* 
+    * read xml, use reflection to instantiate the object, store in the map
+    */
+    static {
+        // load xml
+        InputStream resourceAsStream = BeanFactory.class.getClassLoader().getResourceAsStream("beans.xml")
+        // read xml
+        SAXReader saxReader = new SAXReader();
+        try {
+            Document document = saxReader.getRootElement();
+            Element rootElement = document.getRootElement();
+            List<Element> beanList = rootElement.selectNodes("//bean");
+            for (int i = 0; i < beanList.size(); i++) {
+                Element element =  beanList.get(i);
+                // get bean id 和 class property
+                String id = element.attributeValue("id");        // accountDao
+                String clazz = element.attributeValue("class");  // com.test.dao.impl.JdbcAccountDaoImpl
+                // use reflection to instantiate the object
+                Class<?> aClass = Class.forName(clazz);
+                Object o = aClass.newInstance();
+
+                // store in the map
+                map.put(id, o);
+        }
+
+        // pass property of the bean into Oject
+        List<Element> propertyList = rootElement.selectNodes("//property");
+        // read property, get super element
+        for (int i = 0; i < propertyList.size(); i++) {
+            Element element = propertyList.get(i); //<property name="AccountDao" ref="accountDao"></property>
+            String name = element.attributeValue("name");
+            String ref = element.attributeValue("ref");
+
+            // find parent
+            Element parent = element.getParent();
+
+            // call parent element reflection
+            String parentId = parent.attributeValue("id");
+            Object parentObject = map.get(parentId);
+            // search all the methods
+            Method[] methods = parentObject.getClass().getMethods();
+            for (int j = 0; j < methods.length; j++) {
+                Method method = methods[j];
+                if (method.getName().equalsIgnoreCase("set" + name)) { // setAccountDao(AccountDao accountDao)
+                    method.invoke(parentObject, map.get(ref));
+                }
+            }
+
+            // put parentObject back into map
+            map.put(parentId, parentObject);
+        }
+    } catch (DocumentException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /* 
+    * provide interfaces for creating objects (id) 
+    * @param id
+    * @return
+    */
+    public static Object getBean(String id) {
+        return map.get(id);
+    }
+}
+````
+````java
+@WebServlet(name = "transerServlet", urlPatterns = "/transferServlet")
+public class TransferServlet extends HttpServlet {
+    // create service instance
+    // private TransferService transferService = new TransferServiceImpl();
+
+    // get service object through BeanFactory
+    private TransferService transferService = (TransferService) BeanFactory.getBean("transferService");
+
+    
+    public class TransferServiceImpl implements TransferService {
+        // get Dao object through BeanFactory
+        // private AccountDao accountDao = (AccountDao) BeanFactory.getBean("accountDao");
+
+        // better way
+        private AccountDao accountDao;
+
+        public void setAccountDao(AccountDao accountDao) {
+        this.accountDao = accountDao;
+    }
+    }
+
+````
+***P2 TransactionStatus***
+make one wrong transaction 
+````java
+accountDao.updateAccountByCardNo(to);
+int i = 1/0;
+accountDao.updateAccountByCardNo(from);
+
+````
+run the application, click transfer button(A sent $100 to B), get an error, however, when checking the database, 
+
+**B get $100, but A is still have the same amount of money!!!**
+
+**solution**
++ executing multiple UPDATE statement in one connection
++ put tranaction in service layer
+
+***TransactionStatus code***
+***add ConnectionUtils***
+````java
+
+/**
+ * get connection
+ */
+public class ConnectionUtils {
+
+    private ThreadLocal<Connection> threadLocal = new ThreadLocal<>(); // store current threadlocal
+
+    /**
+     * connection from thread
+     */
+    public Connection getCurrentThreadConn() throws SQLException {
+       
+        Connection connection = threadLocal.get();
+        if(connection == null) {
+            // get connection
+            connection = DruidUtils.getInstance().getConnection();
+            // put into threadlocal
+            threadLocal.set(connection);
+        }
+        return connection;
+    }
+}
+````
+***add TransactionManager***
+
+````java
+public class TransactionManager {
+
+    private ConnectionUtils connectionUtils;
+
+    public void setConnectionUtils(ConnectionUtils connectionUtils) {
+        this.connectionUtils = connectionUtils;
+    }
+
+    // begin transaction
+    public void beginTransaction() throws SQLException {
+        connectionUtils.getCurrentThreadConn().setAutoCommit(false);
+    }
+
+    // commit transaction
+    public void commit() throws SQLException {
+        connectionUtils.getCurrentThreadConn().commit();
+    }
+
+    // rollback
+    public void rollback() throws SQLException {
+        connectionUtils.getCurrentThreadConn().rollback();
+    }
+}
+````
+***add ProxyFactory***
+````java
+public class ProxyFactory {
+
+    private TransactionManager transactionManager;
+
+    public void setTransactionManager(TransactionManager transactionManager) {
+        this.transactionManager = transactionManager;
+    }
+
+    /* 
+    Jdk Dynamic Proxy
+    @param obj
+    @return proxy object
+    */
+    public Object getJdkProxy(Object obj) {
+
+        // get proxy object
+        return Proxy.newProxyInstance(obj.getClass.getClassLoader(), obj.getClass().getInterfaces(), new InvocationHandler() {
+
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                Object result = null;
+                try {
+                     transactionManager.beginTransaction();
+                     result = method.invoke(obj,args);
+                    // 
+                    transactionManager.commit();
+                }catch (Exception e) {
+                    e.printStackTrace();
+                    // 
+                    transactionManager.rollback();
+                    // throw e can be caught by servlet
+                    throw e;
+                }
+                return result;
+
+                }
+            }
+        });
+    }
+
+    /* 
+    * cglib get Dynamic Proxy
+    @param obj
+    @return proxy object
+    */
+    public Object getCglibProxy(Object obj) {
+
+        // get proxy object
+        return Enhancer.create(obj.getClass(),  new MethodInterceptor() {
+
+            @Override
+            public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+                Object result = null;
+                try {
+                     transactionManager.beginTransaction();
+                     result = method.invoke(obj,objects);
+                    // 
+                    transactionManager.commit();
+                }catch (Exception e) {
+                    e.printStackTrace();
+                    // 
+                    transactionManager.rollback();
+                    // throw e can be caught by servlet
+                    throw e;
+                }
+                return result;
+
+                }
+            }
+        });
+    }
+}
+````
+***modify beans.xml***
+````java
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--each bean represent a class-->
+<beans>
+    
+    <bean id="accountDao" class="com.test.dao.impl.JdbcAccountDaoImpl">
+        <property name="ConnectionUtils" ref="connectionUtils"/>
+    </bean>
+
+    <bean id="transferService" class="com.test.service.impl.TransferServiceImpl">
+        <!--set+ name, Method injectione -->
+        <property name="AccountDao" ref="accountDao"></property>
+    </bean>
+    
+<!--each bean represent a class-->
+    
+</beans>
+````
+````java
+````
+## from Servlet to ApplicatoinContext
 
 + **Map** 容器
 
@@ -116,30 +751,10 @@
 + **BeanWrapper**包装器模式：缓存到了Ioc容器，缓存
     持有Bean引用
 
-## ico顶层设计， ListableBeanFactory为例
-```flow
-
-st=>start: 用户
-op1=>operation: ApplicationContext
-sub1=>operation: BeanDefinitionReader
-sub2=>operation: BeanDefinition
-cond=>start: getBean()
-cond2=>operation: BeanWrappe
-
-io=>inputoutput: BeanWrapper
-para=>start: factory
-
-st->op1->cond
-io->cond
-sub1(left)->io
-cond(right)->para
-para(right)->sub1(bottom)->sub2
-sub2->cond2
-cond2(left)->cond
-```
-<br>
+## IOC 顶层设计， ListableBeanFactory为例
 
 用户通过 =>  **ApplicationContext** => 调用 **getBean()**方法， 底层各种factory方法listable等，创建factory对象， 所以要调用**BeanDefinitionReader**, 读取bean配置文件，创建 **BeanDefinition** = > 换存到容器里就是**BeanWrapper**对象， 所以getBean()实际拿到的就是**BeanWrapper**对象
+
 
 ````java
 init() {
