@@ -75,7 +75,7 @@ To do:
 Give credit here.
 - This project was inspired by...
 - This project was based on [this tutorial](https://www.example.com).
-- Many thanks to...
+- Many thanks to yanliang [yanliang](https://gyl-coder.top/)
 
 
 ## Contact
@@ -410,6 +410,7 @@ public class TransferServiceImpl implements TransferService {
 
 ````
 
+
 Method injection, allows to inject a dependency right at the point of use
 when you have mutiple implementation, Method injection is a good choice
 
@@ -725,13 +726,171 @@ public class ProxyFactory {
         <!--set+ name, Method injectione -->
         <property name="AccountDao" ref="accountDao"></property>
     </bean>
-    
-<!--each bean represent a class-->
-    
+
+<!--add three new bean-->
+<bean id="connectionUtils" class="com.test.utils.ConnectionUtils">
+</bean>
+
+<!--transactionManager bean-->
+ <bean id="transactionManager" class="com.test.utils.TransactionManager">
+        <property name="ConnectionUtils" ref="connectionUtils"/>
+    </bean>
+ <!--ProxyFactory-->
+    <bean id="proxyFactory" class="com.test.factory.ProxyFactory">
+        <property name="TransactionManager" ref="transactionManager"/>
+    </bean>   
 </beans>
 ````
+
 ````java
+public class JdbcAccountDaoImpl implements AccountDao {
+
+    private ConnectionUtils connectionUtils;
+
+    public void setConnecionUtils(ConnectionUtils connecionUtils) {
+        this.connectionUtils = connectionUtils;
+    }
+
+    @Override
+    public Account queryAccountByCardNo(String cardNo) throws Exception {
+        
+        // Connection con = DruidUtils.getInstance().getConnection();
+        // get connection from threadlocal
+        Connection con = connectionUtils.getCurrentThreadConn();
+        String sql = "select * from account where cardNo=?";
+        PreparedStatement preparedStatement = con.prepareStatement(sql);
+        preparedStatement.setString(1,cardNo);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        Account account = new Account();
+        while(resultSet.next()) {
+            account.setCardNo(resultSet.getString("cardNo"));
+            account.setName(resultSet.getString("name"));
+            account.setMoney(resultSet.getInt("money"));
+        }
+
+        resultSet.close();
+        preparedStatement.close();
+        con.close();
+
+        return account;
+    }
+
+    @Override
+    public int updateAccountByCardNo(Account account) throws Exception {
+        
+        // Connection con = DruidUtils.getInstance().getConnection();
+        Connection con = connectionUtils.getCurrentThreadConn();
+        String sql = "update account set money=? where cardNo=?";
+        PreparedStatement preparedStatement = con.prepareStatement(sql);
+        preparedStatement.setInt(1,account.getMoney());
+        preparedStatement.setString(2,account.getCardNo());
+        int i = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+        // con.close();
+        return i;
+    }
+}
 ````
+***modify TransferServlet***
+````java
+@WebServlet(name = "transerServlet", urlPatterns = "/transferServlet")
+public class TransferServlet extends HttpServlet {
+    // create service instance
+    // private TransferService transferService = new TransferServiceImpl();
+
+    // get service object through BeanFactory
+    // private TransferService transferService = (TransferService) BeanFactory.getBean("transferService");
+
+    // get proxy object from factory
+    private ProxyFactory proxyFactory = (ProxyFactory) BeanFactory.getBean("proxyFactory");
+    private TransferService transferService = (TransferService) proxyFactory.getProxy(BeanFactory.getBean("transferService"));
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        doPost(req,resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        
+        req.setCharacterEncoding("UTF-8");
+
+        String fromCardNo = req.getParameter("fromCardNo");
+        String toCardNo = req.getParameter("toCardNo");
+        String moneyStr = req.getParameter("money");
+        int money = Integer.parseInt(moneyStr);
+
+        Result result = new Result();
+
+        try {
+
+            // 2. call service method
+            transferService.transfer(fromCardNo,toCardNo,money);
+            result.setStatus("200");
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.setStatus("201");
+            result.setMessage(e.toString());
+        }
+
+        // 
+        resp.setContentType("application/json;charset=utf-8");
+        resp.getWriter().print(JsonUtils.object2Json(result));
+    }
+}
+````
+***p2 problem solved***
+
+***Q: why use proxy for transferServiceImpl?***
+
+without proxy, all transtation relate code would be put in the TransferServiceImpl
+
+```java
+public class TransferServiceImpl implements TransferService {
+
+   
+    private AccountDao accountDao;
+
+   
+
+    public void setAccountDao(AccountDao accountDao) {
+        this.accountDao = accountDao;
+    }
+
+    @Override
+    public void transfer(String fromCardNo, String toCardNo, int money) throws Exception {
+
+        try{
+            
+            TransactionManager.getInstance().beginTransaction();*/
+
+            Account from = accountDao.queryAccountByCardNo(fromCardNo);
+            Account to = accountDao.queryAccountByCardNo(toCardNo);
+
+            from.setMoney(from.getMoney()-money);
+            to.setMoney(to.getMoney()+money);
+
+            accountDao.updateAccountByCardNo(to);
+            // make a error to test
+            int c = 1/0;
+            accountDao.updateAccountByCardNo(from);
+            
+            TransactionManager.getInstance().commit();
+        }catch (Exception e) {
+            e.printStackTrace();
+            
+            TransactionManager.getInstance().rollback();
+            
+            throw e;
+        }
+    }
+}
+```
+we can see the transaction and Impl have become a tight couple, if there are multiple Impl need transaction method, we need add the same codes on every single method. Using proxy way to realize transaction management is a AOP
+
 ## from Servlet to ApplicatoinContext
 
 + **Map** 容器
