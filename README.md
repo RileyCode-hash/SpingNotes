@@ -5,7 +5,7 @@
 ## Table of Contents
 * [Spring V1.0 DispatcherServlet](#Spring_V1.0_DispatcherServlet)
 * [from Servlet to ApplicatoinContext](#from-servlet-to-applicatoinContext)
-* [Features](#features)
+* [IoC](#ioc)
 * [Screenshots](#screenshots)
 * [Setup](#setup)
 * [Usage](#usage)
@@ -219,9 +219,11 @@ cardNo  varcher     255 bank account
 
 
 &vArr;  &vArr;
+
 `TransferService` // service class create Dao instance as singleton, invokes its Dao layer method： AccountDao accountDao = new JdbcAccountDaoImpl();
 
 &vArr;  &vArr; 
+
 `AccountDao`  // Dao provides multiple Impl
   
 &darr;.......................................  &darr; 
@@ -367,10 +369,12 @@ public class JdbcAccountDaoImpl implements AccountDao {
 
 
 &vArr;  &vArr;
+
 interface: `TransferService` // public class TransferServiceImpl implements TransferService {
 impl: `TransferServiceImpl`   // private AccountDao accountDao = new JdbcAccountDaoImpl();
 
 &vArr;  &vArr; 
+
 interface:`AccountDao`  
 impl: `JdbcAccountDaoImpl`
 
@@ -421,6 +425,8 @@ new
 &darr;
 `JdbcAccountDaoImpl`
 
+---
+
 ***now:***
 `TransferServiceImpl`
 &darr;
@@ -435,7 +441,7 @@ xml:
 com.test.dao.JdbcAccountDaoImpl
 com.test.service.TransferServiceImpl
 ```
-
+---
 ***code***
 
 ***define bean.xml file***
@@ -892,7 +898,7 @@ public class TransferServiceImpl implements TransferService {
 we can see the transaction and Impl have become a tight couple, if there are multiple Impl need transaction method, we need add the same codes on every single method. Using proxy way to realize transaction management is a AOP
 
 ## from Servlet to ApplicatoinContext
-
+## IoC
 + **Map** 容器
 
 + **BeanFactory** 工厂  
@@ -943,6 +949,94 @@ getBean() {
     populateBean(); //依赖注入
 }
 ````
+***1.1 the most basic bean container***
+define a simple bean container: BeanFactory, contains a map to store bean, owns registry and get Bean two methods.  
+````java
+public class BeanFactory {
+	private Map<String, Object> beanMap = new HashMap<>();
+
+	public void registerBean(String name, Object bean) {
+		beanMap.put(name, bean);
+	}
+
+	public Object getBean(String name) {
+		return beanMap.get(name);
+	}
+}
+
+````
+````java
+public class SimpleBeanContainerTest {
+
+	@Test
+	public void testGetBean() throws Exception {
+		BeanFactory beanFactory = new BeanFactory();
+		beanFactory.registerBean("helloService", new HelloService());
+		HelloService helloService = (HelloService) beanFactory.getBean("helloService");
+		assertThat(helloService).isNotNull();
+		assertThat(helloService.sayHello()).isEqualTo("hello");
+	}
+
+	class HelloService {
+		public String sayHello() {
+			System.out.println("hello");
+			return "hello";
+		}
+	}
+}
+
+````
+
+***BeanDefinition & BeanDefinitionRegistry***
+![p](https://github.com/DerekYRC/mini-spring/blob/main/assets/bean-definition-and-bean-definition-registry.png?raw=true)
+
+click here [code download](https://github.com/RileyCode-hash/SpringNotes/tree/BeanDefinition-BeanDefinitionRegistry/minSpring)
+
+
+
+>  ...beans.factory.config.SingletonBeanRegistry.java
+
+>  ...beans.factory.config.BeanDefinition.java
+
+> ...beans.factory.support.DefaultSingletonBeanRegistry.java
+
+> ...beans.factory.BeanFactory.java
+
+>  ...beans.factory.support.AbstractAutowireCapableBeanFactory.java
+
+>  ...beans.factory.support.AbstractBeanFactory.java
+
+> ...beans.factory.support.BeanDefinitionRegistry.java
+
+> ...beans.factory.support.DefaultListableBeanFactory.java
+
+````java
+package org.springframework.beans;
+public class BeanDefinitionAndBeanDefinitionRegistryTest {
+
+	@Test
+	public void testBeanFactory() throws Exception {
+		DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+		BeanDefinition beanDefinition = new BeanDefinition(HelloService.class);
+		beanFactory.registerBeanDefinition("helloService", beanDefinition);
+
+		HelloService helloService = (HelloService) beanFactory.getBean("helloService");
+		helloService.sayHello();
+	}
+}
+
+class HelloService {
+	public String sayHello() {
+		System.out.println("hello");
+		return "hello";
+	}
+}
+
+
+````
+
+
+
 
 
 # 基础java知识
