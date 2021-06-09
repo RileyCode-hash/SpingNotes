@@ -1,4 +1,6 @@
-package org.springframework.beans;
+package org.springframework.beans.factory;
+
+import org.springframework.beans.BeansException;
 
 import java.util.HashMap;
 import java.util.Map;
